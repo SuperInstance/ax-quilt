@@ -1,0 +1,106 @@
+{
+  "name": "oriented-pipeline",
+  "cells": {
+    "image_resizer": {
+      "id": "image_resizer",
+      "io_type": "docker",
+      "inputs": [
+        {
+          "name": "image",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "resized",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "resizes images to 256x256",
+      "orientation": {
+        "x_axis": {
+          "name": "width_pixels",
+          "dtype": "int",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": false
+        },
+        "y_axis": {
+          "name": "height_pixels",
+          "dtype": "int",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": false
+        },
+        "z_axis": {
+          "name": "channel",
+          "dtype": "string",
+          "sorted": true,
+          "sort_order": "ascending",
+          "monotonic": false
+        },
+        "self_sort": "RGB channel order: red, green, blue"
+      },
+      "self_sort": "",
+      "backing": {
+        "image": "ax-quilt/resizer:v1"
+      },
+      "metadata": {}
+    },
+    "time_series_db": {
+      "id": "time_series_db",
+      "io_type": "database",
+      "inputs": [
+        {
+          "name": "ts",
+          "kind": "int",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "metric",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "value",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "time-indexed metric store",
+      "orientation": {
+        "x_axis": {
+          "name": "timestamp",
+          "dtype": "int",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": true
+        },
+        "y_axis": {
+          "name": "metric",
+          "dtype": "string",
+          "sorted": true,
+          "sort_order": "ascending",
+          "monotonic": false
+        },
+        "z_axis": null,
+        "self_sort": ""
+      },
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    }
+  },
+  "ranges": {},
+  "flows": [],
+  "flow_description": "",
+  "metadata": {}
+}

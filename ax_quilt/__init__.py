@@ -3,15 +3,19 @@
 A cell is ANY IO object. Cells compose in spreadsheet-like ranges.
 Two agents cooperate: Designer (NL, cellular view) + Porter (backend manifests).
 
+Each cell has FIRST-PERSON ORIENTATION (its own X/Y/Z axes) and
+self-organizes via DOUBLE-ENTRY BOOKKEEPING (every flow has two sides).
+
 Three layers of abstraction (AWS CDK-inspired):
-- L1: Cell (a single IO object)
+- L1: Cell (a single IO object) + Orientation (its private axes)
 - L2: Workbook (composed cells with opinionated defaults)
 - L3: Pattern (a reusable, validated workbook for a specific use case)
 
 Public API:
     from ax_quilt import (
-        # L1 — cells
+        # L1 — cells + orientation
         Cell, Port, Range, Flow, Workbook,
+        Orientation, Axis,  # first-person cell coordinates
         IOType, PortKind, RangeLayout,
         # L2 — agents
         DesignerAgent, PorterAgent,
@@ -26,6 +30,9 @@ Public API:
 from .cells.cell import (
     IOType, PortKind, Port, Cell, Range, RangeLayout, Flow, Workbook,
 )
+from .cells.orientation import (
+    Axis, Orientation, axis_permutation, describe_self_sort,
+)
 from .agents.designer import DesignerAgent
 from .agents.porter import PorterAgent
 from .patterns.pattern import (
@@ -39,12 +46,13 @@ from .patterns.mixins import (
 )
 
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 
 __all__ = [
     "__version__",
     "IOType", "PortKind", "Port", "Cell", "Range", "RangeLayout", "Flow", "Workbook",
+    "Axis", "Orientation", "axis_permutation", "describe_self_sort",  # first-person orientation
     "DesignerAgent", "PorterAgent",
     "Pattern", "PATTERNS", "get_pattern", "list_patterns",
     "Wave", "SyncPhase", "assign_waves", "apply_wave", "order_by_wave", "wave_report",

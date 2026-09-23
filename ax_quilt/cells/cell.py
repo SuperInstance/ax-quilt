@@ -82,6 +82,8 @@ class Cell:
     inputs: List[Port]
     outputs: List[Port]
     formula: str  # NL description of what this cell does
+    orientation: Any = None  # Optional[Orientation] from orientation.py
+    self_sort: str = ""  # how the cell sorts itself (NL)
     backing: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -96,6 +98,8 @@ class Cell:
                           "description": p.description, "optional": p.optional}
                          for p in self.outputs],
             "formula": self.formula,
+            "orientation": self.orientation.to_dict() if self.orientation else None,
+            "self_sort": self.self_sort,
             "backing": self.backing,
             "metadata": self.metadata,
         }
@@ -185,17 +189,39 @@ class Workbook:
         self.flows.append(flow)
 
     def validate(self) -> List[str]:
-        """Validate the whole workbook."""
+        """Validate the whole workbook.
+
+        Checks:
+        - All cells valid
+        - All ranges reference valid cells
+        - All flows reference valid cells
+        - Double-entry bookkeeping: every source output has a target input
+          (except terminal cells: actuator, file, database, embedded_quilt)
+        """
         issues = []
         for cell in self.cells.values():
             issues.extend(cell.validate())
         for rng in self.ranges.values():
             issues.extend(rng.validate(self.cells))
+        # Index flows by source/target for double-entry check
+        outputs_used = set()
         for flow in self.flows:
             if flow.from_cell not in self.cells:
                 issues.append(f"Flow: from_cell {flow.from_cell} not in cells")
             if flow.to_cell not in self.cells:
                 issues.append(f"Flow: to_cell {flow.to_cell} not in cells")
+            outputs_used.add((flow.from_cell, flow.from_port))
+        # Check all source outputs have a target (no orphan credits)
+        for cid, cell in self.cells.items():
+            for output in cell.outputs:
+                if (cid, output.name) not in outputs_used:
+                    # Allow terminal outputs (actuators, displays, archives)
+                    if cell.io_type not in (IOType.ACTUATOR, IOType.FILE,
+                                              IOType.DATABASE, IOType.EMBEDDED_QUILT):
+                        issues.append(
+                            f"Cell {cid} output {output.name} has no consumer "
+                            f"(unbalanced credit)"
+                        )
         return issues
 
     def to_dict(self) -> Dict:

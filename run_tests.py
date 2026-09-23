@@ -11,6 +11,7 @@ from ax_quilt import (
     Pattern, get_pattern, list_patterns,
     assign_waves, order_by_wave, wave_report,
     apply_mixin, apply_mixins,
+    Orientation, Axis, describe_self_sort, axis_permutation,
 )
 from ax_quilt.canary import canary as canary_func
 
@@ -38,7 +39,7 @@ def t_canary():
 
 
 def t_version():
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.3.1"
 
 
 # ─── Cell tests ─────────────────────────────────────────────
@@ -132,9 +133,10 @@ def t_workbook_validate():
     wb = Workbook(name="x", flow_description="test")
     wb.add_cell(Cell(id="A1", io_type=IOType.DOCKER, inputs=[],
                      outputs=[Port(name="out", kind=PortKind.STRING)], formula="x"))
-    wb.add_cell(Cell(id="A2", io_type=IOType.DOCKER,
+    # A2 is a DATABASE (terminal type) so its output "out" doesn't need a consumer
+    wb.add_cell(Cell(id="A2", io_type=IOType.DATABASE,
                      inputs=[Port(name="in", kind=PortKind.STRING)],
-                     outputs=[Port(name="out", kind=PortKind.STRING)], formula="x"))
+                     outputs=[], formula="x"))
     wb.add_flow(Flow(from_cell="A1", from_port="out",
                       to_cell="A2", to_port="in", description="data"))
     issues = wb.validate()
@@ -426,6 +428,131 @@ def t_apply_mixins_to_workbook():
     assert wb.cells["A"].metadata["witness"] is True
 
 
+# ─── Orientation (first-person cell coordinates) tests ──────
+
+def t_axis_basic():
+    a = Axis(name="width", dtype=PortKind.INT, monotonic=True)
+    assert a.name == "width"
+    assert a.dtype == PortKind.INT
+    assert a.monotonic is True
+
+
+def t_axis_to_dict():
+    a = Axis(name="metric", dtype=PortKind.STRING, sorted=True,
+             sort_order="ascending")
+    d = a.to_dict()
+    assert d["name"] == "metric"
+    assert d["sorted"] is True
+
+
+def t_orientation_x_only():
+    o = Orientation(x_axis=Axis(name="ts", dtype=PortKind.INT))
+    assert len(o.axes()) == 1
+    assert o.is_sortable() is False
+
+
+def t_orientation_xyz():
+    o = Orientation(
+        x_axis=Axis(name="x", dtype=PortKind.INT),
+        y_axis=Axis(name="y", dtype=PortKind.INT),
+        z_axis=Axis(name="z", dtype=PortKind.STRING, sorted=True),
+    )
+    axes = o.axes()
+    assert len(axes) == 3
+    assert axes[2].sorted is True
+    assert o.is_sortable()
+
+
+def t_cell_with_orientation():
+    """A cell can have its own first-person orientation."""
+    c = Cell(
+        id="resizer",
+        io_type=IOType.DOCKER,
+        inputs=[Port(name="img", kind=PortKind.IMAGE)],
+        outputs=[Port(name="out", kind=PortKind.IMAGE)],
+        formula="resizes",
+        orientation=Orientation(
+            x_axis=Axis(name="width", dtype=PortKind.INT),
+            y_axis=Axis(name="height", dtype=PortKind.INT),
+        ),
+    )
+    assert c.orientation is not None
+    assert c.orientation.x_axis.name == "width"
+
+
+def t_orientation_to_dict():
+    o = Orientation(
+        x_axis=Axis(name="ts", dtype=PortKind.INT, monotonic=True),
+        y_axis=Axis(name="metric", dtype=PortKind.STRING, sorted=True),
+        self_sort="primary index on (ts, metric)",
+    )
+    d = o.to_dict()
+    assert d["x_axis"]["name"] == "ts"
+    assert d["y_axis"]["name"] == "metric"
+    assert d["self_sort"] == "primary index on (ts, metric)"
+
+
+def t_describe_self_sort():
+    """Generate NL description of a cell's self-sort."""
+    c = Cell(
+        id="tsdb", io_type=IOType.DATABASE,
+        inputs=[Port(name="ts", kind=PortKind.INT)],
+        outputs=[],
+        formula="ts store",
+        orientation=Orientation(
+            x_axis=Axis(name="timestamp", dtype=PortKind.INT, monotonic=True),
+            y_axis=Axis(name="metric", dtype=PortKind.STRING, sorted=True),
+        ),
+    )
+    desc = describe_self_sort(c)
+    assert "timestamp" in desc
+    assert "metric" in desc
+
+
+def t_axis_permutation_identity():
+    a1 = Axis(name="x", dtype=PortKind.INT, sorted=True)
+    a2 = Axis(name="x", dtype=PortKind.INT, sorted=True)
+    assert axis_permutation(a1, a2) == "identity"
+
+
+def t_axis_permutation_rename():
+    a1 = Axis(name="width", dtype=PortKind.INT)
+    a2 = Axis(name="height", dtype=PortKind.INT)
+    assert axis_permutation(a1, a2) == "rename"
+
+
+def t_axis_permutation_swap_dtype():
+    a1 = Axis(name="x", dtype=PortKind.INT)
+    a2 = Axis(name="x", dtype=PortKind.STRING)
+    assert axis_permutation(a1, a2) == "swap_dtype"
+
+
+def t_double_entry_balanced():
+    """A workbook with matching source outputs and target inputs validates."""
+    wb = Workbook(name="balanced")
+    wb.add_cell(Cell(id="src", io_type=IOType.DOCKER, inputs=[],
+                     outputs=[Port(name="data", kind=PortKind.STRING)], formula="x"))
+    # dst is a DATABASE (terminal type — no consumer needed)
+    wb.add_cell(Cell(id="dst", io_type=IOType.DATABASE,
+                     inputs=[Port(name="data", kind=PortKind.STRING)],
+                     outputs=[],
+                     formula="stores data"))
+    wb.add_flow(Flow(from_cell="src", from_port="data",
+                      to_cell="dst", to_port="data"))
+    issues = wb.validate()
+    assert not any("unbalanced" in i for i in issues), f"got: {issues}"
+
+
+def t_double_entry_unbalanced():
+    """A cell with an unused output (except for terminal types) is flagged."""
+    wb = Workbook(name="unbalanced")
+    wb.add_cell(Cell(id="src", io_type=IOType.DOCKER, inputs=[],
+                     outputs=[Port(name="data", kind=PortKind.STRING)], formula="x"))
+    # No flow — source output has no consumer (and it's not a terminal type)
+    issues = wb.validate()
+    assert any("unbalanced" in i for i in issues)
+
+
 # ─── Run tests ──────────────────────────────────────────────
 
 test("test_canary", t_canary)
@@ -469,7 +596,21 @@ test("test_mixin_canary", t_mixin_canary)
 test("test_mixin_witness", t_mixin_witness)
 test("test_apply_mixins_to_workbook", t_apply_mixins_to_workbook)
 
-print("\n=== ax-quilt v0.3.0 test results ===")
+# Orientation (first-person cell coords) tests
+test("test_axis_basic", t_axis_basic)
+test("test_axis_to_dict", t_axis_to_dict)
+test("test_orientation_x_only", t_orientation_x_only)
+test("test_orientation_xyz", t_orientation_xyz)
+test("test_cell_with_orientation", t_cell_with_orientation)
+test("test_orientation_to_dict", t_orientation_to_dict)
+test("test_describe_self_sort", t_describe_self_sort)
+test("test_axis_permutation_identity", t_axis_permutation_identity)
+test("test_axis_permutation_rename", t_axis_permutation_rename)
+test("test_axis_permutation_swap_dtype", t_axis_permutation_swap_dtype)
+test("test_double_entry_balanced", t_double_entry_balanced)
+test("test_double_entry_unbalanced", t_double_entry_unbalanced)
+
+print("\n=== ax-quilt v0.3.1 test results ===")
 for name, status in results:
     print(f"  {status:60} {name}")
 

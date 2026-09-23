@@ -1,0 +1,251 @@
+{
+  "name": "industrial-audit-with-orientations",
+  "cells": {
+    "plc_sensor": {
+      "id": "plc_sensor",
+      "io_type": "sensor",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "tag_value",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "timestamp",
+          "kind": "int",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "reads a PLC tag every 100ms",
+      "orientation": null,
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "vector_embedder": {
+      "id": "vector_embedder",
+      "io_type": "custom",
+      "inputs": [
+        {
+          "name": "value",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "ts",
+          "kind": "int",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vector",
+          "kind": "tensor",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "embeds (value, ts) into 1024-d vector",
+      "orientation": null,
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "jev_oracle": {
+      "id": "jev_oracle",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "claim",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "verdict",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "confidence",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "asks JEV oracle whether reading is canon-worthy",
+      "orientation": null,
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "invoice_audit": {
+      "id": "invoice_audit",
+      "io_type": "file",
+      "inputs": [
+        {
+          "name": "input_hash",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "output_hash",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "appends input\u2192output diff to Merkle-chained audit log",
+      "orientation": null,
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "alert_display": {
+      "id": "alert_display",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "alert",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "renders anomaly alerts on homelab LED wall",
+      "orientation": null,
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "ts_archive": {
+      "id": "ts_archive",
+      "io_type": "file",
+      "inputs": [
+        {
+          "name": "ts",
+          "kind": "int",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "archives timestamp stream",
+      "orientation": {
+        "x_axis": {
+          "name": "ts",
+          "dtype": "int",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": true
+        },
+        "y_axis": null,
+        "z_axis": null,
+        "self_sort": ""
+      },
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    },
+    "confidence_log": {
+      "id": "confidence_log",
+      "io_type": "database",
+      "inputs": [
+        {
+          "name": "conf",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "logs JEV confidences for audit",
+      "orientation": {
+        "x_axis": {
+          "name": "conf",
+          "dtype": "float",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": false
+        },
+        "y_axis": {
+          "name": "ts",
+          "dtype": "int",
+          "sorted": false,
+          "sort_order": "ascending",
+          "monotonic": true
+        },
+        "z_axis": null,
+        "self_sort": ""
+      },
+      "self_sort": "",
+      "backing": {},
+      "metadata": {}
+    }
+  },
+  "ranges": {},
+  "flows": [
+    {
+      "from_cell": "plc_sensor",
+      "from_port": "tag_value",
+      "to_cell": "vector_embedder",
+      "to_port": "value",
+      "description": ""
+    },
+    {
+      "from_cell": "plc_sensor",
+      "from_port": "tag_value",
+      "to_cell": "invoice_audit",
+      "to_port": "input_hash",
+      "description": ""
+    },
+    {
+      "from_cell": "vector_embedder",
+      "from_port": "vector",
+      "to_cell": "jev_oracle",
+      "to_port": "claim",
+      "description": ""
+    },
+    {
+      "from_cell": "vector_embedder",
+      "from_port": "vector",
+      "to_cell": "invoice_audit",
+      "to_port": "output_hash",
+      "description": ""
+    },
+    {
+      "from_cell": "jev_oracle",
+      "from_port": "verdict",
+      "to_cell": "alert_display",
+      "to_port": "alert",
+      "description": ""
+    },
+    {
+      "from_cell": "plc_sensor",
+      "from_port": "timestamp",
+      "to_cell": "ts_archive",
+      "to_port": "ts",
+      "description": ""
+    },
+    {
+      "from_cell": "jev_oracle",
+      "from_port": "confidence",
+      "to_cell": "confidence_log",
+      "to_port": "conf",
+      "description": ""
+    }
+  ],
+  "flow_description": "Industrial PLC tags flow through semantic embedding, JEV oracle gates, tamper-evident invoice cells record transformations. Each cell declares its own first-person orientation (private X/Y axes as tensor dimensions).",
+  "metadata": {}
+}
