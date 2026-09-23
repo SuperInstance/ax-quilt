@@ -1,0 +1,151 @@
+{
+  "name": "canon-feed",
+  "cells": {
+    "canon_search": {
+      "id": "canon_search",
+      "io_type": "network",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "hits",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "searches the quilt-canon-search index for matching canon pieces",
+      "backing": {
+        "endpoint": "quilt-canon-search:8000"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "polyformality_required": true,
+        "polyformality_threshold": 0.5
+      }
+    },
+    "canon_iterator": {
+      "id": "canon_iterator",
+      "io_type": "go_binary",
+      "inputs": [
+        {
+          "name": "hits",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "pieces",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "iterates the search hits and emits each canon piece",
+      "backing": {},
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "polyformality_required": true,
+        "polyformality_threshold": 0.5
+      }
+    },
+    "web_consumer": {
+      "id": "web_consumer",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "piece",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "renders canon pieces to the web feed",
+      "backing": {},
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "polyformality_required": true,
+        "polyformality_threshold": 0.5
+      }
+    },
+    "agent_consumer": {
+      "id": "agent_consumer",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "piece",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "delivers canon pieces to agent pool via SSE",
+      "backing": {},
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "polyformality_required": true,
+        "polyformality_threshold": 0.5
+      }
+    },
+    "archive_consumer": {
+      "id": "archive_consumer",
+      "io_type": "file",
+      "inputs": [
+        {
+          "name": "piece",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "archives canon pieces to JSONL archive file",
+      "backing": {
+        "path": "/var/canon/archive.jsonl"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "polyformality_required": true,
+        "polyformality_threshold": 0.5
+      }
+    }
+  },
+  "ranges": {},
+  "flows": [
+    {
+      "from_cell": "canon_search",
+      "from_port": "hits",
+      "to_cell": "canon_iterator",
+      "to_port": "hits",
+      "description": ""
+    },
+    {
+      "from_cell": "canon_iterator",
+      "from_port": "pieces",
+      "to_cell": "web_consumer",
+      "to_port": "piece",
+      "description": ""
+    },
+    {
+      "from_cell": "canon_iterator",
+      "from_port": "pieces",
+      "to_cell": "agent_consumer",
+      "to_port": "piece",
+      "description": ""
+    },
+    {
+      "from_cell": "canon_iterator",
+      "from_port": "pieces",
+      "to_cell": "archive_consumer",
+      "to_port": "piece",
+      "description": ""
+    }
+  ],
+  "flow_description": "Searches canon for keywords, iterates matching canon pieces, and broadcasts the feed to multiple consumers (web, agent, archive).",
+  "metadata": {
+    "pattern": "canon-feed"
+  }
+}

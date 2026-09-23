@@ -1,0 +1,218 @@
+{
+  "name": "industrial-audit",
+  "cells": {
+    "plc_sensor": {
+      "id": "plc_sensor",
+      "io_type": "sensor",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "tag_value",
+          "kind": "float",
+          "description": "PLC tag reading",
+          "optional": false
+        },
+        {
+          "name": "timestamp",
+          "kind": "int",
+          "description": "when sampled",
+          "optional": false
+        }
+      ],
+      "formula": "reads a PLC tag every 100ms; emits the value + timestamp",
+      "backing": {
+        "plc_host": "192.168.1.10",
+        "tag": "TEMP_REACTOR_01"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "witness": true,
+        "witness_log_path": "/workspace/research/plc_sensor-witness.jsonl"
+      }
+    },
+    "vector_embedder": {
+      "id": "vector_embedder",
+      "io_type": "custom",
+      "inputs": [
+        {
+          "name": "value",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "ts",
+          "kind": "int",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "vector",
+          "kind": "tensor",
+          "description": "1024-d embedding",
+          "optional": false
+        }
+      ],
+      "formula": "embeds (value, ts) into 1024-d vector for similarity queries",
+      "backing": {
+        "library": "substrate-vectors",
+        "dims": 1024
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "witness": true,
+        "witness_log_path": "/workspace/research/vector_embedder-witness.jsonl"
+      }
+    },
+    "jev_oracle": {
+      "id": "jev_oracle",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "claim",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "verdict",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "confidence",
+          "kind": "float",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "asks JEV oracle whether this reading is canon-worthy (anomaly or expected)",
+      "backing": {
+        "endpoint": "https://api.typesafe.ai/v1/jev"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "witness": true,
+        "witness_log_path": "/workspace/research/jev_oracle-witness.jsonl"
+      }
+    },
+    "invoice_audit": {
+      "id": "invoice_audit",
+      "io_type": "file",
+      "inputs": [
+        {
+          "name": "input_hash",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "output_hash",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "receipt_id",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "appends input\u2192output diff to Merkle-chained audit log",
+      "backing": {
+        "path": "/audit/invoices.jsonl",
+        "hash_chain": "merkle"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "witness": true,
+        "witness_log_path": "/workspace/research/invoice_audit-witness.jsonl"
+      }
+    },
+    "alert_display": {
+      "id": "alert_display",
+      "io_type": "network",
+      "inputs": [
+        {
+          "name": "alert",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "renders anomaly alerts on homelab LED wall",
+      "backing": {
+        "display_endpoint": "http://homelab.local/api/alerts"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d",
+        "witness": true,
+        "witness_log_path": "/workspace/research/alert_display-witness.jsonl"
+      }
+    }
+  },
+  "ranges": {
+    "pipeline": {
+      "id": "pipeline",
+      "cell_ids": [
+        "plc_sensor",
+        "vector_embedder",
+        "invoice_audit",
+        "alert_display"
+      ],
+      "layout": "pipeline",
+      "description": "the canonical PLC \u2192 audit \u2192 alert flow",
+      "formulas": {}
+    }
+  },
+  "flows": [
+    {
+      "from_cell": "plc_sensor",
+      "from_port": "tag_value",
+      "to_cell": "vector_embedder",
+      "to_port": "value",
+      "description": ""
+    },
+    {
+      "from_cell": "plc_sensor",
+      "from_port": "tag_value",
+      "to_cell": "invoice_audit",
+      "to_port": "input_hash",
+      "description": ""
+    },
+    {
+      "from_cell": "vector_embedder",
+      "from_port": "vector",
+      "to_cell": "jev_oracle",
+      "to_port": "claim",
+      "description": ""
+    },
+    {
+      "from_cell": "vector_embedder",
+      "from_port": "vector",
+      "to_cell": "invoice_audit",
+      "to_port": "output_hash",
+      "description": ""
+    },
+    {
+      "from_cell": "jev_oracle",
+      "from_port": "verdict",
+      "to_cell": "alert_display",
+      "to_port": "alert",
+      "description": ""
+    }
+  ],
+  "flow_description": "Industrial PLC tags flow through semantic embedding, JEV oracle gates canon-worthy readings, and tamper-evident invoice cells record every transformation. Alerts appear on the homelab display wall.",
+  "metadata": {
+    "pattern": "industrial-audit"
+  }
+}

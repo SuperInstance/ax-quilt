@@ -8,6 +8,9 @@ from ax_quilt import (
     __version__, canary,
     Cell, Port, PortKind, IOType, Range, RangeLayout, Flow, Workbook,
     DesignerAgent, PorterAgent,
+    Pattern, get_pattern, list_patterns,
+    assign_waves, order_by_wave, wave_report,
+    apply_mixin, apply_mixins,
 )
 from ax_quilt.canary import canary as canary_func
 
@@ -35,7 +38,7 @@ def t_canary():
 
 
 def t_version():
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 # ─── Cell tests ─────────────────────────────────────────────
@@ -308,6 +311,121 @@ def t_porter_file_volume():
     assert "F1-vol" in manifest["volumes"]
 
 
+# ─── Pattern (L3) tests ─────────────────────────────────────
+
+def t_list_patterns():
+    patterns = list_patterns()
+    assert "industrial-audit" in patterns
+    assert "image-pipeline" in patterns
+    assert "canon-feed" in patterns
+
+
+def t_get_pattern():
+    p = get_pattern("industrial-audit")
+    assert p is not None
+    assert p.name == "industrial-audit"
+    assert "audit" in p.tags
+
+
+def t_pattern_build():
+    p = get_pattern("industrial-audit")
+    wb = p.build()
+    assert wb.name == "industrial-audit"
+    assert "plc_sensor" in wb.cells
+    assert "invoice_audit" in wb.cells
+
+
+def t_pattern_validate():
+    p = get_pattern("industrial-audit")
+    wb = p.build()
+    issues = p.validate(wb)
+    assert issues == [], f"Pattern should validate: {issues}"
+
+
+def t_pattern_to_docker():
+    """A pattern's workbook should port to Docker."""
+    p = get_pattern("image-pipeline")
+    wb = p.build()
+    porter = PorterAgent()
+    manifest = porter.port_to_docker(wb)
+    assert "A1" in manifest["services"]
+    assert "A3" in manifest["services"]
+
+
+# ─── Wave (sync waves) tests ────────────────────────────────
+
+def t_assign_waves_linear():
+    """A→B→C should be waves 0, 1, 2."""
+    wb = Workbook(name="x")
+    for cid in ["A", "B", "C"]:
+        wb.add_cell(Cell(id=cid, io_type=IOType.DOCKER, inputs=[],
+                          outputs=[Port(name="o", kind=PortKind.STRING)], formula="x"))
+    wb.add_flow(Flow(from_cell="A", from_port="o", to_cell="B", to_port="i"))
+    wb.add_flow(Flow(from_cell="B", from_port="o", to_cell="C", to_port="i"))
+    waves = assign_waves(wb)
+    assert waves["A"].wave == 0
+    assert waves["B"].wave == 1
+    assert waves["C"].wave == 2
+
+
+def t_assign_waves_diamond():
+    """A→B,C→D should be 0, 1, 1, 2."""
+    wb = Workbook(name="x")
+    for cid in ["A", "B", "C", "D"]:
+        wb.add_cell(Cell(id=cid, io_type=IOType.DOCKER, inputs=[],
+                          outputs=[Port(name="o", kind=PortKind.STRING)], formula="x"))
+    wb.add_flow(Flow(from_cell="A", from_port="o", to_cell="B", to_port="i"))
+    wb.add_flow(Flow(from_cell="A", from_port="o", to_cell="C", to_port="i"))
+    wb.add_flow(Flow(from_cell="B", from_port="o", to_cell="D", to_port="i"))
+    wb.add_flow(Flow(from_cell="C", from_port="o", to_cell="D", to_port="i"))
+    waves = assign_waves(wb)
+    assert waves["A"].wave == 0
+    assert waves["B"].wave == 1
+    assert waves["C"].wave == 1
+    assert waves["D"].wave == 2
+
+
+def t_order_by_wave():
+    """order_by_wave returns cells in topological order."""
+    wb = Workbook(name="x")
+    for cid in ["A", "B", "C", "D"]:
+        wb.add_cell(Cell(id=cid, io_type=IOType.DOCKER, inputs=[],
+                          outputs=[Port(name="o", kind=PortKind.STRING)], formula="x"))
+    wb.add_flow(Flow(from_cell="A", from_port="o", to_cell="B", to_port="i"))
+    wb.add_flow(Flow(from_cell="A", from_port="o", to_cell="C", to_port="i"))
+    wb.add_flow(Flow(from_cell="B", from_port="o", to_cell="D", to_port="i"))
+    order = order_by_wave(wb)
+    # A must come before B/C, D must come last
+    assert order.index("A") < order.index("B")
+    assert order.index("A") < order.index("C")
+
+
+# ─── Mixin tests ─────────────────────────────────────────────
+
+def t_mixin_canary():
+    cell = Cell(id="x", io_type=IOType.DOCKER, inputs=[],
+                 outputs=[Port(name="o", kind=PortKind.STRING)], formula="x")
+    apply_mixin(cell, "canary")
+    assert cell.metadata["canary"] == "0x24a555471370b18d"
+
+
+def t_mixin_witness():
+    cell = Cell(id="x", io_type=IOType.DOCKER, inputs=[],
+                 outputs=[Port(name="o", kind=PortKind.STRING)], formula="x")
+    apply_mixin(cell, "witness")
+    assert cell.metadata["witness"] is True
+    assert "witness_log_path" in cell.metadata
+
+
+def t_apply_mixins_to_workbook():
+    wb = Workbook(name="x")
+    wb.add_cell(Cell(id="A", io_type=IOType.DOCKER, inputs=[],
+                     outputs=[Port(name="o", kind=PortKind.STRING)], formula="x"))
+    apply_mixins(wb, ["canary", "witness"])
+    assert wb.cells["A"].metadata["canary"] == "0x24a555471370b18d"
+    assert wb.cells["A"].metadata["witness"] is True
+
+
 # ─── Run tests ──────────────────────────────────────────────
 
 test("test_canary", t_canary)
@@ -334,7 +452,24 @@ test("test_porter_go", t_porter_go)
 test("test_porter_database", t_porter_database)
 test("test_porter_file_volume", t_porter_file_volume)
 
-print("\n=== ax-quilt v0.2.0 test results ===")
+# Pattern (L3) tests
+test("test_list_patterns", t_list_patterns)
+test("test_get_pattern", t_get_pattern)
+test("test_pattern_build", t_pattern_build)
+test("test_pattern_validate", t_pattern_validate)
+test("test_pattern_to_docker", t_pattern_to_docker)
+
+# Wave tests
+test("test_assign_waves_linear", t_assign_waves_linear)
+test("test_assign_waves_diamond", t_assign_waves_diamond)
+test("test_order_by_wave", t_order_by_wave)
+
+# Mixin tests
+test("test_mixin_canary", t_mixin_canary)
+test("test_mixin_witness", t_mixin_witness)
+test("test_apply_mixins_to_workbook", t_apply_mixins_to_workbook)
+
+print("\n=== ax-quilt v0.3.0 test results ===")
 for name, status in results:
     print(f"  {status:60} {name}")
 

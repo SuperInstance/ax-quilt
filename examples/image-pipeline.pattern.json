@@ -1,0 +1,186 @@
+{
+  "name": "image-pipeline",
+  "cells": {
+    "A1": {
+      "id": "A1",
+      "io_type": "network",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "image",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "fetches an image from a URL and emits the image bytes",
+      "backing": {
+        "endpoint": "https://api.example.com/image"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d"
+      }
+    },
+    "A2": {
+      "id": "A2",
+      "io_type": "go_binary",
+      "inputs": [
+        {
+          "name": "image",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "valid",
+          "kind": "bool",
+          "description": "",
+          "optional": false
+        },
+        {
+          "name": "error",
+          "kind": "string",
+          "description": "",
+          "optional": true
+        }
+      ],
+      "formula": "validates image format and dimensions",
+      "backing": {},
+      "metadata": {
+        "canary": "0x24a555471370b18d"
+      }
+    },
+    "A3": {
+      "id": "A3",
+      "io_type": "docker",
+      "inputs": [
+        {
+          "name": "image",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "resized",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "resizes the image to 256x256 preserving aspect ratio",
+      "backing": {
+        "image": "ax-quilt/resizer:v1"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d"
+      }
+    },
+    "A4": {
+      "id": "A4",
+      "io_type": "database",
+      "inputs": [
+        {
+          "name": "metadata",
+          "kind": "json",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "id",
+          "kind": "string",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "formula": "stores image metadata in postgres and returns the record id",
+      "backing": {
+        "engine": "postgres"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d"
+      }
+    },
+    "A5": {
+      "id": "A5",
+      "io_type": "file",
+      "inputs": [
+        {
+          "name": "content",
+          "kind": "image",
+          "description": "",
+          "optional": false
+        }
+      ],
+      "outputs": [],
+      "formula": "stores the resized image as a file on shared volume",
+      "backing": {
+        "path": "/data/resized.jpg"
+      },
+      "metadata": {
+        "canary": "0x24a555471370b18d"
+      }
+    }
+  },
+  "ranges": {
+    "pipeline": {
+      "id": "pipeline",
+      "cell_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "layout": "pipeline",
+      "description": "the image processing pipeline",
+      "formulas": {}
+    }
+  },
+  "flows": [
+    {
+      "from_cell": "A1",
+      "from_port": "image",
+      "to_cell": "A2",
+      "to_port": "image",
+      "description": ""
+    },
+    {
+      "from_cell": "A1",
+      "from_port": "image",
+      "to_cell": "A3",
+      "to_port": "image",
+      "description": ""
+    },
+    {
+      "from_cell": "A2",
+      "from_port": "valid",
+      "to_cell": "A3",
+      "to_port": "image",
+      "description": ""
+    },
+    {
+      "from_cell": "A3",
+      "from_port": "resized",
+      "to_cell": "A4",
+      "to_port": "metadata",
+      "description": ""
+    },
+    {
+      "from_cell": "A3",
+      "from_port": "resized",
+      "to_cell": "A5",
+      "to_port": "content",
+      "description": ""
+    }
+  ],
+  "flow_description": "Fetches an image, validates it, resizes it, stores metadata and the resized image",
+  "metadata": {
+    "pattern": "image-pipeline"
+  }
+}
