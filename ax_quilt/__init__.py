@@ -1,7 +1,10 @@
 """ax-quilt — cellular spreadsheet orchestrator.
 
 A cell is ANY IO object. Cells compose in spreadsheet-like ranges.
-Two agents cooperate: Designer (NL, cellular view) + Porter (backend manifests).
+THREE agents cooperate:
+  - Designer   (NL, cellular view)
+  - Porter     (backend manifests: Docker/K8s/Go)
+  - Projection (last-mile UI/HW/engine: ESP32/NMEA/React/Bevy/...)
 
 Each cell has FIRST-PERSON ORIENTATION (its own X/Y/Z axes) and
 self-organizes via DOUBLE-ENTRY BOOKKEEPING (every flow has two sides).
@@ -17,14 +20,17 @@ Public API:
         Cell, Port, Range, Flow, Workbook,
         Orientation, Axis,  # first-person cell coordinates
         IOType, PortKind, RangeLayout,
-        # L2 — agents
-        DesignerAgent, PorterAgent,
+        # L2 — three agents
+        DesignerAgent, PorterAgent, ProjectionAgent,
+        ProjectionTarget, TEMPLATES, THREE_AGENT_DOCTRINE,
         # L3 — patterns
         Pattern, get_pattern, list_patterns,
         # Sync waves (ArgoCD-style)
         assign_waves, order_by_wave, wave_report,
         # Mixins
         apply_mixin, apply_mixins,
+        # Zoom levels
+        zoom_in, zoom_out,
     )
 """
 from .cells.cell import (
@@ -35,6 +41,10 @@ from .cells.orientation import (
 )
 from .agents.designer import DesignerAgent
 from .agents.porter import PorterAgent
+from .agents.projection import (
+    ProjectionAgent, ProjectionTarget, A2UIComponent, A2UITemplate,
+    TEMPLATES, THREE_AGENT_DOCTRINE,
+)
 from .patterns.pattern import (
     Pattern, PATTERNS, get_pattern, list_patterns,
 )
@@ -44,9 +54,12 @@ from .patterns.waves import (
 from .patterns.mixins import (
     MIXINS, apply_mixin, apply_mixins,
 )
+from .zoom import (
+    IntraCellView, InterCellView, SurfaceView, zoom_in, zoom_out,
+)
 
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 
 __all__ = [

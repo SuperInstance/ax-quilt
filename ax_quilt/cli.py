@@ -5,7 +5,10 @@ import sys
 from pathlib import Path
 
 from . import (
-    Workbook, DesignerAgent, PorterAgent, Cell, Port, PortKind, IOType,
+    Workbook, DesignerAgent, PorterAgent, ProjectionAgent, ProjectionTarget,
+    TEMPLATES, THREE_AGENT_DOCTRINE,
+    zoom_in, zoom_out,
+    Cell, Port, PortKind, IOType,
     Range, RangeLayout, Flow, __version__, canary,
 )
 
@@ -70,6 +73,73 @@ def cmd_version(args):
     """Show version."""
     print(f"ax-quilt v{__version__}")
     print(f"Canary: {canary()}")
+    print(f"\nThree agents: Designer, Porter, Projection")
+    print(f"Projection templates: {', '.join(TEMPLATES.keys())}")
+
+
+def cmd_project(args):
+    """Project a workbook to a last-mile target (UI/HW/engine)."""
+    wb = Workbook.load(args.workbook)
+    agent = ProjectionAgent(template=args.template)
+    # Map target string to enum
+    try:
+        target = ProjectionTarget(args.target)
+    except ValueError:
+        print(f"Unknown target: {args.target}")
+        print(f"Available: {[t.value for t in ProjectionTarget]}")
+        sys.exit(1)
+    out = agent.project(wb, target)
+    if args.output:
+        # If output is a directory and we have multiple files (Go / Bevy), write all
+        out_path = Path(args.output)
+        if out_path.suffix:
+            # Single file
+            if "arduino_ino" in out:
+                out_path.write_text(out["arduino_ino"])
+            elif "nmea_bridge" in out:
+                out_path.write_text(out["nmea_bridge"])
+            elif "htmx_html" in out:
+                out_path.write_text(out["htmx_html"])
+            elif "tui" in out:
+                out_path.write_text(out["tui"])
+            elif "gpio_py" in out:
+                out_path.write_text(out["gpio_py"])
+            elif "bevy_rust" in out:
+                out_path.write_text(out["bevy_rust"])
+            elif "engine_source" in out:
+                out_path.write_text(out["engine_source"])
+            elif "frontend_source" in out:
+                out_path.write_text(out["frontend_source"])
+            elif "a2ui" in out:
+                out_path.write_text(json.dumps(out["a2ui"], indent=2))
+            elif "mqtt_config" in out:
+                out_path.write_text(json.dumps(out["mqtt_config"], indent=2))
+            elif "webhook_routes" in out:
+                out_path.write_text(json.dumps(out["webhook_routes"], indent=2))
+            else:
+                out_path.write_text(json.dumps(out, indent=2))
+            print(f"Projection saved to {args.output}")
+        else:
+            out_path.mkdir(parents=True, exist_ok=True)
+            for k, v in out.items():
+                (out_path / k).write_text(v)
+                print(f"  Wrote {k}")
+    else:
+        # Print first key's value or full dict
+        if len(out) == 1:
+            k, v = next(iter(out.items()))
+            print(v)
+        else:
+            print(json.dumps(out, indent=2))
+
+
+def cmd_zoom(args):
+    """Zoom into a workbook (surface), cell (intra), or flow (inter)."""
+    wb = Workbook.load(args.workbook)
+    if not args.target:
+        print(json.dumps(zoom_out(wb), indent=2))
+    else:
+        print(json.dumps(zoom_in(wb, args.target), indent=2))
 
 
 def cmd_design(args):
@@ -122,6 +192,20 @@ def main():
     p_go.add_argument("workbook")
     p_go.add_argument("--output", "-o", default=".", help="Output directory")
     p_go.set_defaults(func=cmd_go)
+
+    p_proj = sub.add_parser("project", help="Project a workbook to last-mile target (UI/HW/engine)")
+    p_proj.add_argument("workbook")
+    p_proj.add_argument("target", help="Target: esp32_arduino, comport_nmea, htmx_fragment, "
+                                       "react_component, bevy_rust, terminal_dashboard, gpio_python, "
+                                       "comport_nmea, mqtt_publisher, webhook_http, ...")
+    p_proj.add_argument("--template", "-t", help="A2UI template name (e.g. autopilot_dashboard)")
+    p_proj.add_argument("--output", "-o", help="Output file")
+    p_proj.set_defaults(func=cmd_project)
+
+    p_zoom = sub.add_parser("zoom", help="Zoom into a cell (intra) or flow (inter) of a workbook")
+    p_zoom.add_argument("workbook")
+    p_zoom.add_argument("target", help="Cell id, or 'src→tgt' for a flow, or empty for surface view")
+    p_zoom.set_defaults(func=cmd_zoom)
 
     sub.add_parser("version").set_defaults(func=cmd_version)
 

@@ -1,0 +1,153 @@
+{
+  "name": "boat-autopilot-quilt",
+  "flow_description": "Boat autopilot quilt: GPS + IMU + wind sensors + autopilot controller + LED dashboard + NMEA bridge + GPIO switches. The Projection Agent ports to ESP32 LED matrix, Nobeltec COM port, and physical switches/dials.",
+  "cells": {
+    "gps_receiver": {
+      "id": "gps_receiver",
+      "io_type": "embedded_quilt",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "GPS lat/lon/sog/cog stream", "optional": false}],
+      "formula": "GPS receiver emitting lat/lon/sog/cog at 1Hz",
+      "backing": {"endpoint": "/dev/ttyAMA0", "baudrate": 9600},
+      "metadata": {"name": "GPS Receiver", "cell_kind": "gps_sensor"}
+    },
+    "imu_heading": {
+      "id": "imu_heading",
+      "io_type": "embedded_quilt",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "compass heading", "optional": false}],
+      "formula": "IMU emitting magnetic compass heading in degrees",
+      "backing": {"i2c_addr": "0x68"},
+      "metadata": {"name": "IMU Heading", "cell_kind": "imu_sensor"}
+    },
+    "anemometer": {
+      "id": "anemometer",
+      "io_type": "embedded_quilt",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "wind speed & direction", "optional": false}],
+      "formula": "Anemometer emitting wind speed (knots) and direction (degrees)",
+      "backing": {},
+      "metadata": {"name": "Anemometer", "cell_kind": "wind_sensor"}
+    },
+    "rudder_feedback": {
+      "id": "rudder_feedback",
+      "io_type": "embedded_quilt",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "rudder angle in degrees", "optional": false}],
+      "formula": "Rudder position feedback (potentiometer on rudder linkage)",
+      "backing": {},
+      "metadata": {"name": "Rudder Feedback", "cell_kind": "rudder_position"}
+    },
+    "autopilot_controller": {
+      "id": "autopilot_controller",
+      "io_type": "embedded_quilt",
+      "inputs": [
+        {"name": "in_heading", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_gps", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_wind", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_rudder", "kind": "stream", "description": "", "optional": false}
+      ],
+      "outputs": [
+        {"name": "out_rudder_cmd", "kind": "stream", "description": "commanded rudder angle", "optional": false},
+        {"name": "out_engaged", "kind": "bool", "description": "true when autopilot engaged", "optional": false}
+      ],
+      "formula": "PID control loop: compares heading vs target, drives rudder actuator",
+      "backing": {"pid": {"kp": 1.0, "ki": 0.05, "kd": 0.1}},
+      "metadata": {"name": "Autopilot Controller", "cell_kind": "control_loop"}
+    },
+    "rudder_actuator": {
+      "id": "rudder_actuator",
+      "io_type": "actuator",
+      "inputs": [{"name": "in_cmd", "kind": "stream", "description": "commanded rudder", "optional": false}],
+      "outputs": [],
+      "formula": "Physical rudder actuator (drive motor + clutch)",
+      "backing": {},
+      "metadata": {"name": "Rudder Actuator", "cell_kind": "physical_actuator"}
+    },
+    "led_dashboard": {
+      "id": "led_dashboard",
+      "io_type": "embedded_quilt",
+      "inputs": [
+        {"name": "in_heading", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_sog", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_wind", "kind": "stream", "description": "", "optional": false},
+        {"name": "in_engaged", "kind": "bool", "description": "", "optional": false}
+      ],
+      "outputs": [],
+      "formula": "HUB75 LED matrix display on ESP32; shows heading, SOG, wind, AP state",
+      "backing": {"device": "esp32-001", "matrix": "64x32"},
+      "metadata": {"name": "LED Dashboard", "cell_kind": "matrix"}
+    },
+    "nmea_bridge": {
+      "id": "nmea_bridge",
+      "io_type": "network",
+      "inputs": [{"name": "in_gps", "kind": "stream", "description": "GPS cell state", "optional": false}],
+      "outputs": [{"name": "out_serial", "kind": "stream", "description": "NMEA over serial", "optional": false}],
+      "formula": "Translates GPS cell state into NMEA 0183 sentences (GPRMC, GPGGA); writes to serial port for Nobeltec/OpenCPN",
+      "backing": {"serial_port": "/dev/ttyUSB0", "baudrate": 4800},
+      "metadata": {"name": "NMEA Bridge", "cell_kind": "nmea_translator"}
+    },
+    "helm_switch": {
+      "id": "helm_switch",
+      "io_type": "sensor",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "switch state", "optional": false}],
+      "formula": "Physical helm switch (engage/disengage autopilot) on GPIO pin",
+      "backing": {"bcm_pin": 17},
+      "metadata": {"name": "Helm Switch", "cell_kind": "physical_switch"}
+    },
+    "lighting_switch": {
+      "id": "lighting_switch",
+      "io_type": "sensor",
+      "inputs": [],
+      "outputs": [{"name": "out", "kind": "stream", "description": "switch state", "optional": false}],
+      "formula": "Physical lighting switch (running lights) on GPIO pin",
+      "backing": {"bcm_pin": 27},
+      "metadata": {"name": "Lighting Switch", "cell_kind": "physical_switch"}
+    },
+    "ts_archive": {
+      "id": "ts_archive",
+      "io_type": "database",
+      "inputs": [{"name": "in_all", "kind": "stream", "description": "all sensor streams", "optional": false}],
+      "outputs": [],
+      "formula": "Timeseries archive (InfluxDB / TSDB) for sensor streams",
+      "backing": {"db": "influxdb://quilt.lan:8086", "retention_days": 30},
+      "metadata": {"name": "Timeseries Archive", "cell_kind": "tsdb"}
+    },
+    "alert_log": {
+      "id": "alert_log",
+      "io_type": "file",
+      "inputs": [{"name": "in_alert", "kind": "stream", "description": "alerts", "optional": false}],
+      "outputs": [],
+      "formula": "Alert log file (JSONL) for engagement and switch events",
+      "backing": {"path": "/var/log/quilt/alerts.jsonl"},
+      "metadata": {"name": "Alert Log", "cell_kind": "alert_log"}
+    }
+  },
+  "ranges": {},
+  "flows": [
+    {"from_cell": "gps_receiver", "from_port": "out", "to_cell": "autopilot_controller", "to_port": "in_gps", "description": "GPS stream to autopilot"},
+    {"from_cell": "imu_heading", "from_port": "out", "to_cell": "autopilot_controller", "to_port": "in_heading", "description": "compass to autopilot"},
+    {"from_cell": "anemometer", "from_port": "out", "to_cell": "autopilot_controller", "to_port": "in_wind", "description": "wind to autopilot"},
+    {"from_cell": "rudder_feedback", "from_port": "out", "to_cell": "autopilot_controller", "to_port": "in_rudder", "description": "rudder feedback to autopilot"},
+    {"from_cell": "autopilot_controller", "from_port": "out_rudder_cmd", "to_cell": "rudder_actuator", "to_port": "in_cmd", "description": "PID output to rudder motor"},
+    {"from_cell": "autopilot_controller", "from_port": "out_engaged", "to_cell": "led_dashboard", "to_port": "in_engaged", "description": "AP engaged LED"},
+    {"from_cell": "gps_receiver", "from_port": "out", "to_cell": "led_dashboard", "to_port": "in_sog", "description": "SOG to dashboard"},
+    {"from_cell": "anemometer", "from_port": "out", "to_cell": "led_dashboard", "to_port": "in_wind", "description": "wind to dashboard"},
+    {"from_cell": "imu_heading", "from_port": "out", "to_cell": "led_dashboard", "to_port": "in_heading", "description": "heading to dashboard"},
+    {"from_cell": "gps_receiver", "from_port": "out", "to_cell": "nmea_bridge", "to_port": "in_gps", "description": "GPS to NMEA translator"},
+    {"from_cell": "helm_switch", "from_port": "out", "to_cell": "autopilot_controller", "to_port": "in_heading", "description": "helm switch triggers AP engage (semantic overlap)"},
+    {"from_cell": "lighting_switch", "from_port": "out", "to_cell": "alert_log", "to_port": "in_alert", "description": "lighting switch logs to alert file"},
+    {"from_cell": "gps_receiver", "from_port": "out", "to_cell": "ts_archive", "to_port": "in_all", "description": "GPS to archive"},
+    {"from_cell": "imu_heading", "from_port": "out", "to_cell": "ts_archive", "to_port": "in_all", "description": "heading to archive"},
+    {"from_cell": "anemometer", "from_port": "out", "to_cell": "ts_archive", "to_port": "in_all", "description": "wind to archive"},
+    {"from_cell": "autopilot_controller", "from_port": "out_engaged", "to_cell": "alert_log", "to_port": "in_alert", "description": "AP state to alert log"}
+  ],
+  "metadata": {
+    "owner": "Casey",
+    "vessel": "S/V Mavis",
+    "templates": ["autopilot_dashboard"],
+    "doctrine": "Boat sensors and actuators interconnected on the quilt; Projection Agent ports to LED screens on ESP32s for autopilot dashboards, to COM ports for Nobeltec/OpenCPN, and to GPIO for physical switches.",
+    "projection_targets": ["esp32_arduino", "comport_nmea", "gpio_python", "terminal_dashboard", "mqtt_publisher"]
+  }
+}

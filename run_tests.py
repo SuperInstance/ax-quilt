@@ -12,7 +12,9 @@ from ax_quilt import (
     assign_waves, order_by_wave, wave_report,
     apply_mixin, apply_mixins,
     Orientation, Axis, describe_self_sort, axis_permutation,
+    ProjectionAgent, ProjectionTarget, TEMPLATES, THREE_AGENT_DOCTRINE,
 )
+from ax_quilt.zoom import zoom_in, zoom_out
 from ax_quilt.canary import canary as canary_func
 
 
@@ -39,7 +41,7 @@ def t_canary():
 
 
 def t_version():
-    assert __version__ == "0.3.1"
+    assert __version__ == "0.4.0"
 
 
 # ─── Cell tests ─────────────────────────────────────────────
