@@ -1,0 +1,44 @@
+{
+  "version": "3.8",
+  "services": {
+    "jev_oracle": {
+      "image": "alpine:latest",
+      "command": [
+        "sleep",
+        "infinity"
+      ],
+      "networks": [
+        "axnet"
+      ],
+      "labels": {
+        "ax-quilt.role": "network-endpoint"
+      }
+    },
+    "alert_display": {
+      "image": "alpine:latest",
+      "command": [
+        "sleep",
+        "infinity"
+      ],
+      "networks": [
+        "axnet"
+      ],
+      "labels": {
+        "ax-quilt.role": "network-endpoint"
+      },
+      "depends_on": [
+        "jev_oracle"
+      ]
+    }
+  },
+  "networks": {
+    "axnet": {
+      "driver": "bridge"
+    }
+  },
+  "volumes": {
+    "invoice_audit-vol": {
+      "driver": "local"
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "deployments": [],
+  "services": [
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "plc_sensor-vector_embedder"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "plc_sensor"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "plc_sensor-invoice_audit"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "plc_sensor"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "vector_embedder-jev_oracle"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "vector_embedder"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "vector_embedder-invoice_audit"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "vector_embedder"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "jev_oracle-alert_display"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "jev_oracle"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    }
+  ]
+}
