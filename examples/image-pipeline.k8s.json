@@ -1,0 +1,174 @@
+{
+  "deployments": [
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "A2",
+        "labels": {
+          "ax-quilt/cell": "A2",
+          "ax-quilt/formula": "validates image format and dimensions; emits valid/error"
+        }
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "ax-quilt/cell": "A2"
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "ax-quilt/cell": "A2"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "name": "A2",
+                "image": "ax-quilt/A2:latest",
+                "ports": [
+                  {
+                    "containerPort": 8000
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "A3",
+        "labels": {
+          "ax-quilt/cell": "A3",
+          "ax-quilt/formula": "resizes the image to 256x256 preserving aspect ratio"
+        }
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "ax-quilt/cell": "A3"
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "ax-quilt/cell": "A3"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "name": "A3",
+                "image": "ax-quilt/resizer:v1",
+                "ports": [
+                  {
+                    "containerPort": 8000
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "services": [
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "A1-A2"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "A1"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "A1-A3"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "A1"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "A2-A3"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "A2"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "A3-A4"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "A3"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "A3-A5"
+      },
+      "spec": {
+        "selector": {
+          "ax-quilt/cell": "A3"
+        },
+        "ports": [
+          {
+            "port": 8000,
+            "targetPort": 8000
+          }
+        ]
+      }
+    }
+  ]
+}

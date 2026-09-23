@@ -1,0 +1,73 @@
+{
+  "version": "3.8",
+  "services": {
+    "A1": {
+      "image": "alpine:latest",
+      "command": [
+        "sleep",
+        "infinity"
+      ],
+      "networks": [
+        "axnet"
+      ],
+      "labels": {
+        "ax-quilt.role": "network-endpoint"
+      }
+    },
+    "A2": {
+      "build": {
+        "context": ".",
+        "dockerfile": "Dockerfile"
+      },
+      "networks": [
+        "axnet"
+      ],
+      "depends_on": [
+        "A1"
+      ]
+    },
+    "A3": {
+      "image": "ax-quilt/resizer:v1",
+      "environment": {},
+      "ports": [],
+      "networks": [
+        "axnet"
+      ],
+      "labels": {
+        "ax-quilt.cell.id": "A3",
+        "ax-quilt.cell.formula": "resizes the image to 256x256 preserving aspect ratio",
+        "ax-quilt.io-type": "docker"
+      },
+      "depends_on": [
+        "A1",
+        "A2"
+      ]
+    },
+    "A4": {
+      "image": "postgres:15",
+      "environment": {
+        "POSTGRES_DB": "images",
+        "AX_QUILT_A3_PORT": "8000"
+      },
+      "volumes": [
+        "A4-data:/var/lib/postgresql/data"
+      ],
+      "networks": [
+        "axnet"
+      ],
+      "depends_on": [
+        "A3"
+      ]
+    }
+  },
+  "networks": {
+    "axnet": {
+      "driver": "bridge"
+    }
+  },
+  "volumes": {
+    "A5-vol": {
+      "driver": "local"
+    }
+  }
+}
